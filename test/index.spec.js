@@ -2,14 +2,14 @@ import { cosmiconfig } from 'cosmiconfig'
 import makeConsoleMock from 'consolemock'
 import path from 'path'
 
-jest.unmock('execa')
-
-// eslint-disable-next-line import/first
 import getStagedFiles from '../lib/getStagedFiles'
-// eslint-disable-next-line import/first
 import lintStaged from '../lib/index'
+import { wrongNodeVersion } from '../lib/messages'
+import nodeVersion from '../lib/nodeVersion'
 
+jest.unmock('execa')
 jest.mock('../lib/getStagedFiles')
+jest.mock('../lib/nodeVersion')
 
 const replaceSerializer = (from, to) => ({
   test: (val) => typeof val === 'string' && from.test(val),
@@ -170,6 +170,23 @@ describe('lintStaged', () => {
     await expect(
       lintStaged({ configPath: nonExistentConfig, quiet: true }, logger)
     ).rejects.toThrowError()
+
+    expect(logger.printHistory()).toMatchSnapshot()
+  })
+
+  it('should print helpful error message when wrong Node.js version', async () => {
+    expect.assertions(2)
+
+    const error = new Error(wrongNodeVersion('9.0.0', 'MOCK RANGE'))
+    error.isNodeVersionError = true
+    nodeVersion.mockImplementationOnce(async () => {
+      throw error
+    })
+
+    const config = {
+      '*': 'mytask',
+    }
+    await expect(lintStaged({ config, quiet: true }, logger)).rejects.toThrowError()
 
     expect(logger.printHistory()).toMatchSnapshot()
   })
